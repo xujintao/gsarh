@@ -463,9 +463,46 @@ type."".T2 SRODATA size=120
 	rel 104+8 t=1 type.int+0
 ```
 
-##### 可以看到我们平时使用某个类型申明变量以后，变量落到了内存，变量的类型也以常量(read only)的形式落到了内存。
-##### 类型常量很有用，mm的gcmalloc需要它，范型interface{}也需要它。
-##### _type.size域表达了变量占用字节数，具体含义我会在目录树中逐个详细分析。
+##### 可以看到我们平时使用某个类型申明变量(常量)以后，变量(常量)的abi落到了内存，变量(常量)的类型也以常量(read only)的形式落到了内存。
+##### 变量(常量)的abi很重要。
+
+### 三，abi  
+abi信息应该能从编译器代码那边找到，但是我找半天没找到，只能照着runtime代码手写几个重要的来释义。
+```
+// string类型
+type string struct {
+	base unsafe.Pointer
+	len int
+}
+
+// slice类型
+type slice struct {
+	array unsafe.Pointer
+	len   int
+	cap   int
+}
+
+// map类型(hmap的定义在runtime/map.go中)
+type map *hmap
+
+// chan类型(hchan的定义在runtime/chan.go中)
+type chan *hchan
+
+// func类型(funcval的定义在runtime/runtime2.go中)
+type func *funcval
+
+// interface类型(itab的定义在runtime/runtime2.go中)
+type iface struct {
+	tab  *itab
+	data unsafe.Pointer
+}
+
+// interface{}
+type eface struct {
+	_type *_type
+	data  unsafe.Pointer
+}
+```
 
 ### 三，从编译器角度理解类型(留给老冯写)  
 
