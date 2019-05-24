@@ -168,10 +168,13 @@ type T1 int                // main.T1
 type T2 struct{ a int }    // main.T2
 func main() {
 	printType(reflect.TypeOf("abc"))
-	printType(reflect.TypeOf(&"abc"))
+	printType(reflect.PtrTo(reflect.TypeOf("abc")))
 	printType(reflect.TypeOf((*chan int)(nil)).Elem())
+	printType(reflect.TypeOf((*chan int)(nil)))
 	printType(reflect.TypeOf(T1(1)))
+	printType(reflect.PtrTo(reflect.TypeOf(T1(1))))
 	printType(reflect.TypeOf(T2{}))
+	printType(reflect.PtrTo(reflect.TypeOf(T2{})))
 }
 ```
 
@@ -182,8 +185,7 @@ func main() {
 // 使用golang语言表达
 const type.string = _type{}
 const type.*string = _type{}
-
-// 使用json表达常量type.string
+// 把内容序列化出来
 "type.string": {
 	"size": 16,
 	"ptrdata": 8,
@@ -221,8 +223,7 @@ const type.*string = _type{}
 // 使用golang语言表达
 const type.chan_int = _type{}
 const type.*chan_int = _type{}
-
-// 使用json表达
+// 把内容序列化出来
 "type.chan int": {
 	"size": 8,
 	"ptrdata": 8,
@@ -250,7 +251,7 @@ const type.*chan_int = _type{}
 	"ptrToThis": 0	
 }
 
-// golang汇编表达
+// 使用golang汇编表达
 type.chan int SRODATA dupok size=64
 	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
 	0x0010 91 55 cb 71 02 08 08 32 00 00 00 00 00 00 00 00  .U.q...2........
@@ -279,8 +280,7 @@ type.*chan int SRODATA dupok size=56
 // 使用golang语言表达
 const type.main.T1 = _type{}
 const type.*main.T1 = _type{}
-
-// 使用json表达
+// 把内容序列化出来
 "type.main.T1": {
 	"size": 8,
 	"ptrdata": 0,
@@ -339,8 +339,7 @@ type."main".T1 SRODATA size=64
 // golang表达
 const type.main.T2 = _type{}
 const type.*main.T2 = _type{}
-
-// 使用json表达
+// 把内容序列化出来
 "type.main.T2": {
 	"size": 8,
 	"ptrdata": 0,
@@ -400,6 +399,83 @@ type."".T2 SRODATA size=120
 	rel 104+8 t=1 type.int+0
 ```
 
-既然类型成了常量，那么我们平时申明变量的类型是什么？
+##### 可以看到我们平时使用某个类型申明变量以后，变量落到了内存，变量的类型也以常量(read only)的形式落到了内存。
+##### 类型常量很有用，mm的gcmalloc需要它，范型interface{}也需要它。
 
 ### 三，从编译器角度理解类型(留给老冯写)  
+
+
+### 四，自定义类型的方法集
+```
+package main
+
+import "reflect"
+
+// 编译器生成2个类型
+// main.User,
+// *main.User
+type User struct {
+	name string
+	age  int
+}
+
+// 编译器生成2个方法
+// "".User.Foo
+// "".(*User).Foo
+func (p User) Foo() {}
+
+// 编译器生成1个方法
+// "".(*User).Notify
+func (p *User) Notify() {}
+
+// 编译器生成2个类型
+// main.Notifier,
+// *main.Notifier 它没有研究的意义
+// 编译器生成1个方法
+// "".Notifier.Notify
+type Notifier interface {
+	Notify()
+}
+
+// 验证
+func main() {
+	var u User
+	// main.User的方法集: Foo
+	ut := reflect.TypeOf(u) // 构造eface, {main.User, u变量的值(是调用runtime.convT2E对u做copy出来的)}
+	println(ut.String(),
+		ut.Kind().String(),
+		ut.NumMethod()) // need exported methods in the type's method set.
+	for i := 0; i < ut.NumMethod(); i++ {
+		m := ut.Method(i)
+		println(m.Name)
+	}
+	println("")
+
+	// *main.User的方法集: Foo, Notify
+	rut := reflect.TypeOf(&u) // 构造eface, {*main.User, &u变量的值}
+	println(rut.String(), rut.Kind().String(), rut.NumMethod())
+	for i := 0; i < rut.NumMethod(); i++ {
+		m := rut.Method(i)
+		println(m.Name)
+	}
+	println("")
+
+	// main.Notifier的方法集: Notify
+	nt := reflect.TypeOf((*Notifier)(nil)).Elem() // 构造eface, {go.itab.*main.User,main.Notifier, &u变量的值}
+	println(nt.String(), nt.Kind().String(), nt.NumMethod())
+	for i := 0; i < nt.NumMethod(); i++ {
+		m := nt.Method(i)
+		println(m.Name)
+	}
+	println("")
+
+	// *main.Notifier的方法集: 空
+	rnt := reflect.TypeOf((*Notifier)(nil)) // 构造eface, {go.itab.*main.User,*main.Notifier, &u变量的值}
+	println(rnt.String(), rnt.Kind().String(), rnt.NumMethod())
+	for i := 0; i < rnt.NumMethod(); i++ {
+		m := rnt.Method(i)
+		println(m.Name)
+	}
+
+}
+```

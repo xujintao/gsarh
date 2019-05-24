@@ -21,7 +21,7 @@ func (p *User) Notify() {}
 
 // 编译器生成2个类型
 // main.Notifier,
-// *main.Notifier
+// *main.Notifier 它没有研究的意义
 // 编译器生成1个方法
 // "".Notifier.Notify
 type Notifier interface {
@@ -32,8 +32,10 @@ type Notifier interface {
 func main() {
 	var u User
 	// main.User的方法集: Foo
-	ut := reflect.TypeOf(u)                                  // 构造eface, {main.User, u变量的值(是调用runtime.convT2E对u做copy出来的)}
-	println(ut.String(), ut.Kind().String(), ut.NumMethod()) // need exported methods in the type's method set.
+	ut := reflect.TypeOf(u) // 构造eface, {main.User, u变量的值(是调用runtime.convT2E对u做copy出来的)}
+	println(ut.String(),
+		ut.Kind().String(),
+		ut.NumMethod()) // need exported methods in the type's method set.
 	for i := 0; i < ut.NumMethod(); i++ {
 		m := ut.Method(i)
 		println(m.Name)
