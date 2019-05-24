@@ -99,6 +99,8 @@ func main() {
 	printType(reflect.PtrTo(reflect.TypeOf("abc")))
 	printType(reflect.TypeOf((*chan int)(nil)).Elem())
 	printType(reflect.TypeOf((*chan int)(nil)))
+	printType(reflect.TypeOf((*interface{ foo() })(nil)).Elem())
+	printType(reflect.TypeOf((*interface{ foo() })(nil)))
 	printType(reflect.TypeOf(T1(1)))
 	printType(reflect.PtrTo(reflect.TypeOf(T1(1))))
 	printType(reflect.TypeOf(T2{}))

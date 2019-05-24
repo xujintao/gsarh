@@ -2,7 +2,6 @@
 
 golang类型系统有点难, 但是只有掌握了类型系统才能游刃有余的进行oop, 才能理解mm  
 先打个广告，对golang类型系统有什么想法的可以加企鹅群95786324找阿皮，这一点很重要。
-
 ### 一，类型与kind  
 kind是类型的分类
 ```golang
@@ -170,11 +169,14 @@ func printType(t reflect.Type) {
 
 type T1 int                // main.T1
 type T2 struct{ a int }    // main.T2
+type T3 interface{ foo() } // main.T3
 func main() {
 	printType(reflect.TypeOf("abc"))
 	printType(reflect.PtrTo(reflect.TypeOf("abc")))
 	printType(reflect.TypeOf((*chan int)(nil)).Elem())
 	printType(reflect.TypeOf((*chan int)(nil)))
+	printType(reflect.TypeOf((*interface{ foo() })(nil)).Elem())
+	printType(reflect.TypeOf((*interface{ foo() })(nil)))
 	printType(reflect.TypeOf(T1(1)))
 	printType(reflect.PtrTo(reflect.TypeOf(T1(1))))
 	printType(reflect.TypeOf(T2{}))
@@ -275,6 +277,64 @@ type.*chan int SRODATA dupok size=56
 	rel 32+8 t=1 runtime.gcbits.01+0
 	rel 40+4 t=5 type..namedata.*chan int-+0
 	rel 48+8 t=1 type.chan int+0
+
+还要看看常量type.interface{ main.foo()}和常量type.*interface{ main.foo() }的几种表达方式
+
+// 使用golang语言表达
+const type.interface{ main.foo()} = _type{}
+const type.*interface{ main.foo()} = _type{}
+// 把内容序列化出来
+"type.interface{ main.foo()}": {
+	"size": 16,
+	"ptrdata": 16,
+	"hash": 1827387388,
+	"tflag": 2,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 20, // 20&kindMask = 20，是interface
+	"alg": 5954208,
+	"gcdata": 2,
+	"str": 39757,
+	"ptrToThis": 52480
+}
+"type.*interface{ main.foo()}": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 3471523764,
+	"tflag": 0,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 54, // 54&kindMask = 54-32 = 22，是ptr
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 39757,
+	"ptrToThis": 0
+}
+
+// 使用golang汇编表达
+type.interface { main.foo() } SRODATA dupok size=88
+	0x0000 10 00 00 00 00 00 00 00 10 00 00 00 00 00 00 00  ................
+	0x0010 fc b7 eb 6c 02 08 08 14 00 00 00 00 00 00 00 00  ...l............
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0040 01 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00  ................
+	0x0050 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+128
+	rel 32+8 t=1 runtime.gcbits.02+0
+	rel 40+4 t=5 type..namedata.*interface { main.foo() }-+0
+	rel 44+4 t=6 type.*interface { main.foo() }+0
+	rel 56+8 t=1 type.interface { main.foo() }+80
+	rel 80+4 t=5 type..namedata."".0+0
+	rel 84+4 t=5 type.func()+0
+type.*interface { main.foo() } SRODATA dupok size=56
+	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
+	0x0010 b4 3f eb ce 00 08 08 36 00 00 00 00 00 00 00 00  .?.....6........
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.01+0
+	rel 40+4 t=5 type..namedata.*interface { main.foo() }-+0
+	rel 48+8 t=1 type.interface { main.foo() }+0
 ```
 
 类型3
@@ -405,6 +465,7 @@ type."".T2 SRODATA size=120
 
 ##### 可以看到我们平时使用某个类型申明变量以后，变量落到了内存，变量的类型也以常量(read only)的形式落到了内存。
 ##### 类型常量很有用，mm的gcmalloc需要它，范型interface{}也需要它。
+##### _type.size域表达了变量占用字节数，具体含义我会在目录树中逐个详细分析。
 
 ### 三，从编译器角度理解类型(留给老冯写)  
 
