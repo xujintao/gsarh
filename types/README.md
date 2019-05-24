@@ -1,38 +1,405 @@
-reflect/type.go
+## golang type system
 
+golang类型系统有点难, 但是只有掌握了类型系统才能游刃有余的进行oop, 才能理解mm  
 
+### 一，类型与kind  
+kind是类型的分类
 ```golang
-// A Kind represents the specific kind of type that a Type represents.
-// The zero Kind is not a valid kind.
-type Kind uint
-
-const (
-	Invalid Kind = iota
-	Bool
-	Int
-	Int8
-	Int16
-	Int32
-	Int64
-	Uint
-	Uint8
-	Uint16
-	Uint32
-	Uint64
-	Uintptr
-	Float32
-	Float64
-	Complex64
-	Complex128
-	Array
-	Chan
-	Func
-	Interface
-	Map
-	Ptr
-	Slice
-	String
-	Struct
-	UnsafePointer
-)
+// reflect/type.go
+var kindNames = []string{
+	Invalid:       "invalid",
+	Bool:          "bool",
+	Int:           "int",
+	Int8:          "int8",
+	Int16:         "int16",
+	Int32:         "int32",
+	Int64:         "int64",
+	Uint:          "uint",
+	Uint8:         "uint8",
+	Uint16:        "uint16",
+	Uint32:        "uint32",
+	Uint64:        "uint64",
+	Uintptr:       "uintptr",
+	Float32:       "float32",
+	Float64:       "float64",
+	Complex64:     "complex64",
+	Complex128:    "complex128",
+	Array:         "array",
+	Chan:          "chan",
+	Func:          "func",
+	Interface:     "interface",
+	Map:           "map",
+	Ptr:           "ptr",
+	Slice:         "slice",
+	String:        "string",
+	Struct:        "struct",
+	UnsafePointer: "unsafe.Pointer",
+}
 ```
+速度可以有前进1，前进2，前进3  
+同样golang也有类型1，类型2，类型3  
+
+#### 类型1：要落到bool, numeric, string这3种kind中  
+由于这3种类型已经被编译器穷举了，所以类型的identifier和种类的名称是一样的  
+```
+// 比如
+func main() {
+	println(reflect.TypeOf(true).String(),
+		reflect.TypeOf(true).Kind().String()) // bool bool
+	println(reflect.TypeOf(uint8(1)).String(),
+		reflect.TypeOf(uint8(1)).Kind().String()) // uint8 uint8
+	println(reflect.TypeOf("abc").String(),
+		reflect.TypeOf("abc").Kind().String()) // string string
+}
+```
+类型1对应的指针类型：*bool, *numeric, *string要落到ptr中  
+```
+// 比如*bool
+func main() {
+	println(reflect.TypeOf((*bool)(nil)).String(),
+		reflect.TypeOf((*bool)(nil)).Kind().String()) // *bool ptr
+}
+```
+
+#### 类型2：由用户穷举，然后要落到array, slice, map, chan, func, struct, interface这7种kind中
+注意：interface是有类型的，而空接口interface{}没有类型
+```
+func main() {
+	println(reflect.TypeOf([2]int{}).String(),
+		reflect.TypeOf([2]int{}).Kind().String()) // [2]int array
+	println(reflect.TypeOf([]int{}).String(),
+		reflect.TypeOf([]int{}).Kind().String()) // []int slice
+	println(reflect.TypeOf(&[]int{}).String(),
+		reflect.TypeOf(&[]int{}).Kind().String()) // *[]int ptr
+	println(reflect.TypeOf(map[string]int{}).String(),
+		reflect.TypeOf(map[string]int{}).Kind().String()) // map[string]int map
+	println(reflect.TypeOf((*chan int)(nil)).Elem().String(),
+		reflect.TypeOf((*chan int)(nil)).Elem().Kind().String()) //chan int chan
+	println(reflect.TypeOf(func(int) {}).String(),
+		reflect.TypeOf(func(int) {}).Kind().String()) // func(int) func
+	println(reflect.TypeOf(struct{ int }{}).String(),
+		reflect.TypeOf(struct{ int }{}).Kind().String()) // struct {} struct
+	println(reflect.TypeOf((*interface{ foo() })(nil)).Elem().String(),
+		reflect.TypeOf((*interface{ foo() })(nil)).Elem().Kind().String())
+	// interface { main.foo() } interface
+}
+```
+同样，类型2对应的指针类型要落到ptr中  
+```
+// 比如*[]int
+func main() {
+	println(reflect.TypeOf(&[]int{}).String(),
+		reflect.TypeOf(&[]int{}).Kind().String()) // *[]int ptr
+}
+```
+
+#### 类型3：使用type definition自定义出的类型  
+哦，对了，自定义类型的identify要带名字空间所以会带包名  
+```
+type T1 int                // main.T1
+type T2 struct{ a int }    // main.T2
+type T3 interface{ foo() } // main.T3
+func main() {
+	println(reflect.TypeOf(T1(1)).String(),
+		reflect.TypeOf(T1(1)).Kind().String()) // main.T1 int
+	println(reflect.TypeOf(T2{}).String(),
+		reflect.TypeOf(T2{}).Kind().String()) // main.T2 struct
+	println(reflect.TypeOf((*T3)(nil)).Elem().String(),
+		reflect.TypeOf((*T3)(nil)).Elem().Kind().String()) // main.T3 interface
+}
+```
+一样的，类型3对应的指针类型要落到ptr中  
+```
+// 例如*main.T2
+func main() {
+	// println(reflect.TypeOf(&T2{1}).String(),
+	// 	reflect.TypeOf(&T2{1}).Kind().String()) // *main.T2 ptr
+	println(reflect.PtrTo(reflect.TypeOf(T2{1})).String(),
+		reflect.PtrTo(reflect.TypeOf(T2{1})).Kind().String()) // *main.T2 ptr
+}
+```
+
+##### 一个值得注意的规律是，类型与其对应的指针类型要么都不出现，要么总是成对出现，它们是双子  
+
+### 二，类型的进一步探索  
+然而，任何golang类型都是一个_type类型的常量  
+```
+// runtime/type.go
+type _type struct {
+	size       uintptr
+	ptrdata    uintptr // size of memory prefix holding all pointers
+	hash       uint32
+	tflag      tflag
+	align      uint8
+	fieldalign uint8
+	kind       uint8
+	alg        *typeAlg
+	// gcdata stores the GC type data for the garbage collector.
+	// If the KindGCProg bit is set in kind, gcdata is a GC program.
+	// Otherwise it is a ptrmask bitmap. See mbitmap.go for details.
+	gcdata    *byte
+	str       nameOff
+	ptrToThis typeOff
+}
+```
+我们可以查看每个类型的_type结构
+```
+type _type struct {
+	Size       uintptr `json:"size"`
+	Ptrdata    uintptr `json:"ptrdata"`
+	Hash       uint32  `json:"hash"`
+	Tflag      uint8   `json:"tflag"`
+	Align      uint8   `json:"align"`
+	Fieldalign uint8   `json:"fieldalign"`
+	Kind       uint8   `json:"kind"`
+	Alg        uintptr `json:"alg"`
+	Gcdata     *byte   `json:"gcdata"`
+	Str        int32   `json:"str"`
+	PtrToThis  int32   `json:"ptrToThis"`
+}
+
+func printType(t reflect.Type) {
+	at := (*[2]unsafe.Pointer)(unsafe.Pointer(&t)) // 把reflect.Type转成指针数组
+	res, _ := json.Marshal((*_type)(at[1])) // 取data域并序列化出来
+	println(string(res))
+}
+
+type T1 int                // main.T1
+type T2 struct{ a int }    // main.T2
+func main() {
+	printType(reflect.TypeOf("abc"))
+	printType(reflect.TypeOf(&"abc"))
+	printType(reflect.TypeOf((*chan int)(nil)).Elem())
+	printType(reflect.TypeOf(T1(1)))
+	printType(reflect.TypeOf(T2{}))
+}
+```
+
+类型1
+```
+看看常量type.string和常量type.*string的几种表达方式
+
+// 使用golang语言表达
+const type.string = _type{}
+const type.*string = _type{}
+
+// 使用json表达常量type.string
+"type.string": {
+	"size": 16,
+	"ptrdata": 8,
+	"hash": 3774831796,
+	"tflag": 7,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 24, // 24&kindMask = 24，是string
+	"alg": 5954192,
+	"gcdata": 1,
+	"str": 6768,
+	"ptrToThis": 63200
+}
+"type.*string": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 1511480045,
+	"tflag": 0,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 54, // 54&kindMask = 54-32 = 22，是ptr
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 6768,
+	"ptrToThis": 0
+}
+
+// 汇编表达暂时没法看
+```
+
+类型2
+```
+看看常量"type.chan int"和常量"type.*chan int"的几种表达方式
+
+// 使用golang语言表达
+const type.chan_int = _type{}
+const type.*chan_int = _type{}
+
+// 使用json表达
+"type.chan int": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 1909151121,
+	"tflag": 2,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 50, // 50&kindMask = 50-32 = 18，是chan
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 10888,
+	"ptrToThis": 51040	
+}
+"type.*chan int": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 1005419501,
+	"tflag": 0,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 54, // 54&kindMask = 54-32 = 22，是ptr
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 10888,
+	"ptrToThis": 0	
+}
+
+// golang汇编表达
+type.chan int SRODATA dupok size=64
+	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
+	0x0010 91 55 cb 71 02 08 08 32 00 00 00 00 00 00 00 00  .U.q...2........
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00 03 00 00 00 00 00 00 00  ................
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.01+0
+	rel 40+4 t=5 type..namedata.*chan int-+0
+	rel 44+4 t=6 type.*chan int+0
+	rel 48+8 t=1 type.int+0
+type.*chan int SRODATA dupok size=56
+	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
+	0x0010 ed 7b ed 3b 00 08 08 36 00 00 00 00 00 00 00 00  .{.;...6........
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.01+0
+	rel 40+4 t=5 type..namedata.*chan int-+0
+	rel 48+8 t=1 type.chan int+0
+```
+
+类型3
+```
+看看常量type.main.T1和常量type.*main.T1的几种表达方式
+
+// 使用golang语言表达
+const type.main.T1 = _type{}
+const type.*main.T1 = _type{}
+
+// 使用json表达
+"type.main.T1": {
+	"size": 8,
+	"ptrdata": 0,
+	"hash": 2079407416,
+	"tflag": 7,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 130, // 130&kindMask = 130-128 = 2，是int
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 8841,
+	"ptrToThis": 52704
+}
+"type.*main.T1": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 1599159816,
+	"tflag": 0,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 54, // 54&kindMask = 54-32 = 22，是ptr
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 8841,
+	"ptrToThis": 0
+}
+
+// 汇编表达
+runtime.gcbits.01 SRODATA dupok size=1
+	0x0000 01                                               .
+type..namedata.*main.T1. SRODATA dupok size=11
+	0x0000 01 00 08 2a 6d 61 69 6e 2e 54 31                 ...*main.T1
+type.*"main".T1 SRODATA size=56
+	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
+	0x0010 08 3e 51 5f 00 08 08 36 00 00 00 00 00 00 00 00  .>Q_...6........
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.01+0
+	rel 40+4 t=5 type..namedata.*main.T1.+0
+	rel 48+8 t=1 type."".T1+0
+runtime.gcbits. SRODATA dupok size=0
+type."main".T1 SRODATA size=64
+	0x0000 08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0010 38 3d f1 7b 07 08 08 82 00 00 00 00 00 00 00 00  8=.{............
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00 10 00 00 00 00 00 00 00  ................
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.+0
+	rel 40+4 t=5 type..namedata.*main.T1.+0
+	rel 44+4 t=5 type.*"".T1+0
+	rel 48+4 t=5 type..importpath."".+0
+
+然后再看看常量type.main.T2和常量type.*main.T2的几种表达方式
+
+// golang表达
+const type.main.T2 = _type{}
+const type.*main.T2 = _type{}
+
+// 使用json表达
+"type.main.T2": {
+	"size": 8,
+	"ptrdata": 0,
+	"hash": 2038138561,
+	"tflag": 7,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 153, // 153&kindMask = 153-128 = 25, 是struct
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 8852,
+	"ptrToThis": 52768
+}
+"type.*main.T2": {
+	"size": 8,
+	"ptrdata": 8,
+	"hash": 4091785602,
+	"tflag": 0,
+	"align": 8,
+	"fieldAlign": 8,
+	"kind": 54, // 54&kindMask = 54-32 = 22, 是ptr
+	"alg": 5954160,
+	"gcdata": 1,
+	"str": 8852,
+	"ptrToThis": 0
+}
+
+// 汇编表达
+type..namedata.*main.T2. SRODATA dupok size=11
+	0x0000 01 00 08 2a 6d 61 69 6e 2e 54 32                 ...*main.T2
+type.*"".T2 SRODATA size=56
+	0x0000 08 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00  ................
+	0x0010 82 b1 e3 f3 00 08 08 36 00 00 00 00 00 00 00 00  .......6........
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.01+0
+	rel 40+4 t=5 type..namedata.*main.T2.+0
+	rel 48+8 t=1 type."".T2+0
+type."".T2 SRODATA size=120
+	0x0000 08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0010 c1 86 7b 79 07 08 08 99 00 00 00 00 00 00 00 00  ..{y............
+	0x0020 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0030 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0040 01 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00  ................
+	0x0050 00 00 00 00 00 00 00 00 28 00 00 00 00 00 00 00  ........(.......
+	0x0060 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+	0x0070 00 00 00 00 00 00 00 00                          ........
+	rel 24+8 t=1 runtime.algarray+80
+	rel 32+8 t=1 runtime.gcbits.+0
+	rel 40+4 t=5 type..namedata.*main.T2.+0
+	rel 44+4 t=5 type.*"".T2+0
+	rel 48+8 t=1 type..importpath."".+0
+	rel 56+8 t=1 type."".T2+96
+	rel 80+4 t=5 type..importpath."".+0
+	rel 96+8 t=1 type..namedata.a-+0
+	rel 104+8 t=1 type.int+0
+```
+
+既然类型成了常量，那么我们平时申明变量的类型是什么？
+
+### 三，从编译器角度理解类型(留给老冯写)  
