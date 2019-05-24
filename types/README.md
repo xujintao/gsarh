@@ -1,6 +1,7 @@
 ## golang type system
 
 golang类型系统有点难, 但是只有掌握了类型系统才能游刃有余的进行oop, 才能理解mm  
+先打个广告，对golang类型系统有什么想法的可以加企鹅群95786324找阿皮，这一点很重要。
 
 ### 一，类型与kind  
 kind是类型的分类
@@ -62,7 +63,10 @@ func main() {
 ```
 
 #### 类型2：由用户穷举，然后要落到array, slice, map, chan, func, struct, interface这7种kind中
-注意：interface是有类型的，而空接口interface{}没有类型
+注意：interface是有类型的，而空接口interface{}没有类型。  
+《香水》这部电影描述的是除了男主没有气味，其他人都有气味，然后男主就开始收集气味。
+同样美剧《权力的游戏》里除了瓦里斯没有蛋蛋其他人都有蛋蛋，有蛋蛋的为自己的蛋蛋活着，没有蛋蛋的为所有人活着。
+所以，建议认真看完这两部作品以加深对空接口的理解。
 ```
 func main() {
 	println(reflect.TypeOf([2]int{}).String(),
@@ -479,3 +483,5 @@ func main() {
 
 }
 ```
+
+### 五，类型继承  
