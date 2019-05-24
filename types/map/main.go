@@ -1,34 +1,26 @@
 package main
 
-// func main() {
-// 	m := make(map[string]int) // buckets域直接放栈上了
-// 	// m := make(map[string]int, 10) //会调用runtime.makemap
-// 	m["abc"] = 2
-// 	println(m)
-// }
-
-// func foo() map[string]int {
-// 	m := make(map[string]int, 10)
-// 	m["abc"] = 2
-// 	return m
-// }
-
-// func main() {
-// 	m := foo()
-// 	println(m)
-// }
-
+// 1, hashmap的桶数组
+// 2, kafka的partition数组
+// 3, golang的通道数组
+// 4, nginx的upstream数组
+// 5, mysql分库分表
+// 对这些数组做负载均衡就是在做hash
 func main() {
-	m := make(map[int]int) //runtime.makemap_small
-	go func() {
-		for {
-			m[1] = 1 //runtime.mapassign_fast64
-		}
-	}()
-	go func() {
-		for {
-			_ = m[1] //runtime.mapaccess1_fast64
-		}
-	}()
-	select {}
+	m := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+	for k, v := range m {
+		println(k, v)
+	}
+
+	// 查
+	if v, ok := m["a"]; ok {
+		println(v)
+	}
+	if v, ok := m["d"]; ok {
+		println(v)
+	}
 }
