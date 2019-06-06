@@ -8,21 +8,41 @@ package main
 // 6, golang的通道数组
 // 7, golang的定时器桶数组
 // 对这些数组做负载均衡就是在做hash
+
+func foo() map[string]int {
+	// // 方式1
+	// m := make(map[string]int) // runtime.makemap_small
+	// m["a"] = 'a'              // runtime.mapassign_faststr
+	// m["b"] = 'b'              // runtime.mapassign_faststr
+	// m["c"] = 'c'              // runtime.mapassign_faststr
+	// m["d"] = 'd'              // runtime.mapassign_faststr
+
+	// 方式2
+	m := make(map[string]int, 10) // runtime.makemap, 因为hint大于8了，所以会先分配一个桶
+	m["a"] = 'a'                  // runtime.mapassign_faststr
+	m["b"] = 'b'                  // runtime.mapassign_faststr
+	m["c"] = 'c'                  // runtime.mapassign_faststr
+	m["d"] = 'd'                  // runtime.mapassign_faststr
+
+	// // 方式3 与 方式1 一样
+	// m := map[string]int{"a": 'a', "b": 'b', "c": 'c', "d": 'd'}
+	return m
+}
+
 func main() {
-	m := map[string]int{
-		"a": 1,
-		"b": 2,
-		"c": 3,
-	}
-	for k, v := range m {
+	m := foo()
+
+	// // 查方式1
+	// println(m["d"]) // runtime.mapaccess1_faststr
+
+	// // 查方式2
+	// if v, ok := m["d"]; ok { // runtime.mapaccess2_faststr
+	// 	println(v)
+	// }
+
+	// 遍历
+	for k, v := range m { // runtime.mapiterinit, runtime.mapiternext
 		println(k, v)
 	}
-
-	// 查
-	if v, ok := m["a"]; ok {
-		println(v)
-	}
-	if v, ok := m["d"]; ok {
-		println(v)
-	}
+	// println(len(m))
 }
