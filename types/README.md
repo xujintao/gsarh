@@ -122,7 +122,30 @@ func main() {
 }
 ```
 
+##### 类型可以千变万化，但最终还是要落到kind框架中  
 ##### 一个值得注意的规律是，类型与其对应的指针类型要么都不出现，要么总是成对出现，它们是双子  
+##### 另一个特色就是不同类型不能互相赋值  
+```
+buf := make([]byte, 1024) // type byte = uint8 at src/builtin/builtin.go
+
+// ok
+buf[0] = uint8(1)
+
+// cannot use false (type bool) as type byte in assignment
+buf[0] = false
+
+// cannot use struct {} literal (type struct {}) as type byte in assignment
+buf[0] = struct{}{}
+
+// cannot use &buf[0] (type *byte) as type uintptr in assignment
+var addr1 uintptr = &buf[0]
+
+// cannot use unsafe.Pointer(&buf[0]) (type unsafe.Pointer) as type uintptr in assignment
+var addr2 uintptr = unsafe.Pointer(&buf[0])
+
+println(addr1, addr2)
+```
+那么问题来了，类型是作用于值还是作用于变量?  
 
 ### 二，类型的进一步探索  
 编译器会为每种类型自动生成一个类型常量  

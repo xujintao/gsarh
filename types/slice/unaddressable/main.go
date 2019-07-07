@@ -11,12 +11,13 @@ func addressable() {
 	for i := range buf {
 		buf[i] = 0
 	}
+
+	// hack
 	println("slice addr:", &buf)
 	slicep := (*[3]uint)(unsafe.Pointer(&buf))
 	println("slice element:", strconv.FormatUint(uint64(slicep[0]), 16), slicep[1], slicep[2])
 	println("buf[0] addr:", &buf[0])
-	// println(&buf[0] % 16)
-	// println(slicep[0] % 16)
+	println(slicep[0] % 16)
 }
 
 func unaddressable() {
