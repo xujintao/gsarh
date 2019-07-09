@@ -371,3 +371,19 @@ func main() {
 ```
 
 ### 五，类型继承  
+
+
+### 六，c/c++/go
+
+#### 1, string
+```
+       c++使用vector类型去避免指针操作
+       字符数组是个特例，使用string类型
+      /
+     /
+c数组
+     \
+      \
+       go使用slice去避免指针操作
+       也是使用string处理字符数组，它是immutable的，不可伸缩，这样的话string和slice就有了明显的场景区分。回头看c++的vector<char>和string场景就有问题
+```
