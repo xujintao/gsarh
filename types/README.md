@@ -356,4 +356,18 @@ func main() {
 }
 ```
 
+举个例子
+```
+##### 一个值得注意的规律是，类型与其对应的指针类型要么都不出现，要么总是成对出现，它们是双子
+意思就是如果我写了这条语句type student struct{}，那么编译器会给我生成student类型以及*student类型。
+然后我又写了个func (s student)foo(){}，目的是给student类型加了个foo方法，但是编译器会自动帮我生成func (s *student)foo(){}方法。
+目前为止，student类型的方法集是foo，*student类型的方法集是foo。
+但是如果我写个func(s *student)bar(){}，意思是给*student类型加个bar方法，那么问题来了编译器会不会也自动帮我生成func (s student)bar(){}方法？
+答案是不会。所以截至目前，student类型的方法集是foo，然后*student类型的方法集是foo和bar。
+假设接口类型people有两个方法，foo和bar。那么只有*student类型实现了它。
+那么，golang为什么偏心*student类型？
+其实不是的，*student类型的bar方法说明有可能会修改s。如果自动给student类型也加个bar方法，那么在接口赋值场景下我们知道把student类型变量赋值给people类型变量是发生了值拷贝，student类型的bar方法修改s的时候其实修改的是副本，而不是原始s。所以才这样设计。这是golang设计师为自己的脑残设计打的一个补丁。
+那么问题来了，如果是我去设计类型方法集，那么我会学习c++，意思就是只有*student类型有方法集。世界从此变得安静多了。
+```
+
 ### 五，类型继承  
