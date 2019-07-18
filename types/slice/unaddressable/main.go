@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/md5"
-	"strconv"
 	"unsafe"
 )
 
@@ -12,12 +11,13 @@ func addressable() {
 		buf[i] = 0
 	}
 
-	// hack
-	println("slice addr:", &buf)
-	slicep := (*[3]uint)(unsafe.Pointer(&buf))
-	println("slice element:", strconv.FormatUint(uint64(slicep[0]), 16), slicep[1], slicep[2])
-	println("buf[0] addr:", &buf[0])
-	println(slicep[0] % 16)
+	// // hack
+	// println("slice addr:", &buf)
+	// slicep := (*[3]uint)(unsafe.Pointer(&buf))
+	// println("slice element:", strconv.FormatUint(uint64(slicep[0]), 16), slicep[1], slicep[2])
+	// println("buf[0] addr:", &buf[0])
+	// println(slicep[0] % 16)
+	println(uintptr(unsafe.Pointer(&buf[0])) % 16)
 }
 
 func unaddressable() {
