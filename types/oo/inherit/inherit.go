@@ -33,7 +33,7 @@ func (s *service2) bar() {
 }
 
 func main() {
-	var services []interface{}
+	var services []fooer
 	// services[0] = &service1{base{&service1{}}}
 	// services[1] = &service2{base{&service2{}}}
 	s1 := &service1{}
@@ -45,6 +45,6 @@ func main() {
 	services = append(services, s2)
 
 	for _, s := range services {
-		s.(fooer).foo()
+		s.foo()
 	}
 }
