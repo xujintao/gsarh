@@ -5,6 +5,7 @@ type barer interface {
 }
 
 type fooer interface {
+	barer
 	foo()
 }
 
@@ -33,9 +34,11 @@ func (s *service2) bar() {
 }
 
 func main() {
-	var services []fooer
+	// var services [2]fooer
 	// services[0] = &service1{base{&service1{}}}
 	// services[1] = &service2{base{&service2{}}}
+
+	var services []fooer
 	s1 := &service1{}
 	s1.base.barer = s1
 	services = append(services, s1)
@@ -46,5 +49,6 @@ func main() {
 
 	for _, s := range services {
 		s.foo()
+		s.bar()
 	}
 }
